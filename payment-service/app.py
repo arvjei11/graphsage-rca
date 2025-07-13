@@ -1,10 +1,10 @@
-
 import json
 import logging
 import os
 import time
 import uuid
 from datetime import datetime
+import requests
 
 from flask import Flask, jsonify
 from kafka import KafkaProducer
@@ -47,15 +47,20 @@ def charge():
     start_time = time.time()
     trace_id = str(uuid.uuid4())
     
-    # Simulate a successful payment
-    log_message(
-        "INFO",
-        "Payment processed successfully.",
-        trace_id,
-        duration_ms=round((time.time() - start_time) * 1000),
-        status_code=200
-    )
-    return jsonify({"status": "Payment Successful", "traceId": trace_id}), 200
+    # This service now calls the auth-service, creating a dependency
+    try:
+        auth_response = requests.get("http://auth-service:5000/auth", timeout=5)
+        if auth_response.status_code != 200:
+            raise Exception("Authentication service failed.")
+        
+        # If authentication is successful, proceed with payment
+        log_message("INFO", "Payment processed successfully.", trace_id, round((time.time() - start_time) * 1000), 200)
+        return jsonify({"status": "Payment Successful", "traceId": trace_id}), 200
+        
+    except Exception as e:
+        # If authentication fails, this service also fails
+        log_message("ERROR", f"Payment failed due to auth dependency error: {e}", trace_id, round((time.time() - start_time) * 1000), 503)
+        return jsonify({"error": "Downstream service unavailable"}), 503
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
