@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.0.1
@@ -50,6 +48,23 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
 
+  neo4j:
+    image: neo4j:4.4
+    container_name: neo4j
+    ports:
+      - "7474:7474" # For the Neo4j Browser
+      - "7687:7687" # For the Bolt driver connection
+    environment:
+      - NEO4J_AUTH=neo4j/password123 # Sets the username and password
+    volumes:
+      - neo4j-data:/data
+    healthcheck:
+      # This healthcheck uses the native cypher-shell to ensure the database is ready for queries.
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "password123", "RETURN 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
   auth-service:
     build: ./auth-service
     container_name: auth-service
@@ -77,13 +92,23 @@ services:
       - KAFKA_BROKER=kafka:29092
       - ELASTICSEARCH_HOST=elasticsearch
       - REDIS_HOST=redis
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=password123
     depends_on:
-      - kafka
-      - elasticsearch
-      - redis
+      kafka:
+        condition: service_started
+      elasticsearch:
+        condition: service_started
+      redis:
+        condition: service_started
+      neo4j:
+        condition: service_healthy # This is the key change
 
 volumes:
   elasticsearch-data:
     driver: local
   grafana-data:
+    driver: local
+  neo4j-data:
     driver: local
