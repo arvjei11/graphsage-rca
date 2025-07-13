@@ -30,11 +30,25 @@ services:
     container_name: elasticsearch
     environment:
       - "discovery.type=single-node"
-      - "xpack.security.enabled=false" # Disabling security for local dev ease
+      - "xpack.security.enabled=false"
     ports:
       - "9200:9200"
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
+
+  redis:
+    image: redis:6.2-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  grafana:
+    image: grafana/grafana-oss:9.2.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
 
   auth-service:
     build: ./auth-service
@@ -62,10 +76,14 @@ services:
     environment:
       - KAFKA_BROKER=kafka:29092
       - ELASTICSEARCH_HOST=elasticsearch
+      - REDIS_HOST=redis
     depends_on:
       - kafka
       - elasticsearch
+      - redis
 
 volumes:
   elasticsearch-data:
+    driver: local
+  grafana-data:
     driver: local
